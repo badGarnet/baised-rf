@@ -31,3 +31,7 @@ class TestBiasedRandomForestClassifier(unittest.TestCase):
         np.testing.assert_array_equal(self.x, combined[:, :-1])
         np.testing.assert_array_equal(self.y.ravel(), combined[:, -1].ravel())
 
+    def test_fit(self):
+        model = brfc()
+        model.fit(self.x, self.y)
+        self.assertTrue(model._fitted)

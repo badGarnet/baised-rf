@@ -16,6 +16,7 @@ class BiasedRandomForestClassifier(BaseEstimator):
         self.min_leaf_size = min_leaf_size
         self.max_features = max_features
         self.min_sample_split = min_sample_split
+        self.sub_samples = sub_samples
         self.name = 'BiasedRandomForestClassifier'
         self._trees = list()
         self._fitted = False
@@ -43,8 +44,10 @@ class BiasedRandomForestClassifier(BaseEstimator):
     def fit(self, x, y):
         self._trees = list()
         data = self._stack(x, y)
+        if self.max_features is None:
+            self.max_features = x.shape[1]
         for i in range(self.n_estimators):
-            sample = subsample(data, self.subsample) 
+            sample = subsample(data, self.sub_samples) 
             tree = build_tree(
                 sample, self.max_depth, self.min_leaf_size,
                 self.max_features
