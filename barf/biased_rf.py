@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-class BiasedRandomForestClassifier(BaseEstimator):
+class RandomForestClassifier(BaseEstimator):
     def __init__(
         self, n_estimators=100, max_depth=10, random_seed=None,
         min_leaf_size=1, max_features=None, min_sample_split=2,
@@ -17,7 +17,7 @@ class BiasedRandomForestClassifier(BaseEstimator):
         self.max_features = max_features
         self.min_sample_split = min_sample_split
         self.sub_samples = sub_samples
-        self.name = 'BiasedRandomForestClassifier'
+        self.name = 'RandomForestClassifier'
         self._trees = list()
         self._fitted = False
 
@@ -31,8 +31,8 @@ class BiasedRandomForestClassifier(BaseEstimator):
 
     @staticmethod
     def _stack(x, y):
-        x_val = BiasedRandomForestClassifier._get_val(x)
-        y_val = BiasedRandomForestClassifier._get_val(y)
+        x_val = RandomForestClassifier._get_val(x)
+        y_val = RandomForestClassifier._get_val(y)
         if x_val.ndim != 2:
             raise ValueError(f'x must be a 2D array but got shape {x.shape}')
         if y_val.ndim == 1:
@@ -79,3 +79,22 @@ class BiasedRandomForestClassifier(BaseEstimator):
             'false_positives': fp,
             'false_negatives': fn
         }
+
+
+def get_sorted_labels(y):
+    y_labels, label_counts = np.unique(y, return_counts=True)
+    labels = dict(zip(y_labels, label_counts))
+    # sorting labels by counts
+    labels = {k: v for k, v in sorted(labels.items(), key=lambda item: item[1])}
+    return labels
+
+
+class BiasedRFClassifier(BaseEstimator):
+    def __init__(self, p_critical=0.5, k_nearest_neighbor=10, n_estimators=100):
+        self.p_critical = p_critical
+        self.k_nearest_neighbor = k_nearest_neighbor
+        self.n_estimators = n_estimators
+    
+    def fit(self, x, y):
+        # getting unique labels in y and their counts to figure out whta is majority
+        return NotImplemented
