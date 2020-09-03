@@ -53,7 +53,7 @@ class BiasedRandomForestClassifier(BaseEstimator):
                 self.max_features
             )
             self._trees.append(tree)
-        
+
         self._fitted = True
 
         return self
@@ -65,4 +65,17 @@ class BiasedRandomForestClassifier(BaseEstimator):
         predictions = [
             bagging_predict(self._trees, row) for row in x_val
         ]
-        return predictions
+        return np.array(predictions)
+
+    def report(self, x, y):
+        pred = self.predict(x)
+        tp = (y * pred).sum()
+        tn = ((1 - y) * (1 - pred)).sum()
+        fp = ((1 - y) * pred).sum()
+        fn = (y * (1 - pred)).sum()
+        return {
+            'true_positives': tp,
+            'true_negatives': tn,
+            'false_positives': fp,
+            'false_negatives': fn
+        }

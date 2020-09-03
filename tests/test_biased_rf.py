@@ -35,3 +35,23 @@ class TestBiasedRandomForestClassifier(unittest.TestCase):
         model = brfc()
         model.fit(self.x, self.y)
         self.assertTrue(model._fitted)
+
+    def test_predict(self):
+        model = brfc()
+        model.fit(self.x, self.y)
+        pred = model.predict(self.x)
+        unique_preds = np.unique(pred)
+        unique_labels = np.unique(self.y)
+        for p in unique_preds:
+            with self.subTest(p=p):
+                self.assertTrue(p in unique_labels)
+
+    def test_fit_compared_to_sklearn(self):
+        x = np.random.rand(3000).reshape(300, 10)
+        x_sum = x.sum(axis=1)
+        y = np.zeros_like(x_sum)
+        x_cutoff = np.percentile(x_sum, 0.98)
+        # create an uneven label set
+        y[x_sum > x_cutoff] = 1
+        model = brfc().fit(x, y)
+        print(model.report(x, y))
