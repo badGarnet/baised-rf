@@ -6,8 +6,8 @@ import pandas as pd
 
 class TestBiasedRandomForestClassifier(unittest.TestCase):
     def setUp(self):
-        x = np.random.rand(0, 1, 100).reshape(10, 10)
-        y = np.random.randint(0, 4, 10)
+        self.x = np.random.rand(100).reshape(10, 10)
+        self.y = np.random.randint(0, 4, 10)
 
     def test_get_val(self):
         x_df = pd.DataFrame(
