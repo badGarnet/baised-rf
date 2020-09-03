@@ -1,6 +1,6 @@
 import unittest
 from barf.biased_rf import RandomForestClassifier as rfc
-from barf.biased_rf import get_sorted_labels, BiasedRFClassifier
+from barf.biased_rf import get_sorted_labels, BiasedRFClassifier, k_nearest_neighbor
 import numpy as np
 import pandas as pd
 
@@ -50,8 +50,15 @@ class TestBiasedRandomForestClassifier(unittest.TestCase):
     def test_get_sorted_labels(self):
         y = np.zeros((10, 1))
         y[:3] = 2
+        y[3] = 1
         labels = get_sorted_labels(y)
-        self.assertDictEqual(
-            {2: 3, 0: 7}, labels
-        )
-        self.assertListEqual([2, 0], (list(labels.keys())))
+        self.assertListEqual([1, 2, 0], labels)
+
+    def test_k_nearest_neighbor(self):
+        # create a set where there is a repeat of the first row
+        x = np.concatenate([self.x, np.array([self.x[0, :]] * 5)], axis=0)
+        neighbors = k_nearest_neighbor(x[0, :], x[1:, :], 5)
+        # all five neighbors should be the newly added 5 rows, which is the point itself (0 distance)
+        for i in range(5):
+            with self.subTest(i=i):
+                self.assertListEqual(x[0, :].tolist(), neighbors[i, :].tolist())

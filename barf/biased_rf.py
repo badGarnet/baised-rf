@@ -2,6 +2,9 @@ from .base import BaseEstimator
 from .refrence_forest import build_tree, subsample, bagging_predict
 import numpy as np
 import pandas as pd
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class RandomForestClassifier(BaseEstimator):
@@ -82,11 +85,44 @@ class RandomForestClassifier(BaseEstimator):
 
 
 def get_sorted_labels(y):
+    """get unique labels and their counts from input 1D array ``y``; returns will be
+    sorted by the counts
+
+    Args:
+        y (numpy.ndarray or list): must be 1D
+
+    Returns:
+        dict: dictionary containing the unique labels found in ``y`` as keys and
+            the count for each label as values
+    """
     y_labels, label_counts = np.unique(y, return_counts=True)
     labels = dict(zip(y_labels, label_counts))
     # sorting labels by counts
     labels = {k: v for k, v in sorted(labels.items(), key=lambda item: item[1])}
-    return labels
+    return list(labels.keys())
+
+
+def k_nearest_neighbor(p, candidates, n_neighbors):
+    """get the ``n_neighbor`` nearest members from ``array`` to ``p``, measured
+    by Euclidean distance
+
+    Args:
+        p (numpy.array or list): point from where to look for neighbors, must be 1D
+        candidates (numpy.array or list): the domain from where we search for ``p``'s neighbors; must be 2D and the
+            size of the second dimension matches the length of ``p``
+        n_neighbors (int): number of neighbors to return
+    """
+    array = np.array(candidates)
+    assert len(p) == array.shape[1]
+    # calculate Euclidian distances
+    distance = np.sqrt(np.sum((array - p) ** 2, axis=1))
+    # return top neighbors
+    sorted_index = np.argsort(distance)
+    if len(distance) < n_neighbors:
+        log.warning(f'requested {n_neighbors} neighbors but only have {len(distance)} candidates')
+        return array
+    else:
+        return array[sorted_index, :]
 
 
 class BiasedRFClassifier(BaseEstimator):
@@ -97,4 +133,15 @@ class BiasedRFClassifier(BaseEstimator):
     
     def fit(self, x, y):
         # getting unique labels in y and their counts to figure out whta is majority
+        labels_min, labels_maj =  get_sorted_labels(y)
+        # get the row indices for major and minor labels
+        index_maj = y[y==labels_maj]
+        index_min = y[y==labels_min]
+        # separate training set for major and minor labels
+        x_maj = x[index_maj, :]
+        x_min = x[index_min, :]
+
+        for x in x_min:
+            t_nn_x = neareast_neighbor(x, x_maj, self.k_nearest_neighbor)
+
         return NotImplemented
