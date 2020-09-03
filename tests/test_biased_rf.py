@@ -16,3 +16,8 @@ class TestBiasedRandomForestClassifier(unittest.TestCase):
         )
         x_array = brfc()._get_val(x_df)
         np.testing.assert_array_equal(self.x, x_array)
+
+    def test_get_val_with_list(self):
+        x_list = self.x.tolist()
+        x_array = brfc()._get_val(x_list)
+        np.testing.assert_array_equal(self.x, x_array)
