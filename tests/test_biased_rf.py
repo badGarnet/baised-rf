@@ -62,3 +62,10 @@ class TestBiasedRandomForestClassifier(unittest.TestCase):
         for i in range(5):
             with self.subTest(i=i):
                 self.assertListEqual(x[0, :].tolist(), neighbors[i, :].tolist())
+
+    def test_k_nearest_neighbor_index(self):
+        # create a set where there is a repeat of the first row
+        x = np.concatenate([self.x, np.array([self.x[0, :]] * 5)], axis=0)
+        neighbors = k_nearest_neighbor(x[0, :], x[1:, :], 5, return_index=True)
+        # all five neighbors should be the newly added 5 rows, which is the point itself (0 distance)
+        self.assertListEqual(list(range(9, 14)), neighbors)

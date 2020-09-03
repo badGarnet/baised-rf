@@ -102,7 +102,7 @@ def get_sorted_labels(y):
     return list(labels.keys())
 
 
-def k_nearest_neighbor(p, candidates, n_neighbors):
+def k_nearest_neighbor(p, candidates, n_neighbors, return_index=False):
     """get the ``n_neighbor`` nearest members from ``array`` to ``p``, measured
     by Euclidean distance
 
@@ -120,9 +120,14 @@ def k_nearest_neighbor(p, candidates, n_neighbors):
     sorted_index = np.argsort(distance)
     if len(distance) < n_neighbors:
         log.warning(f'requested {n_neighbors} neighbors but only have {len(distance)} candidates')
-        return array
+        results = range(len(distance))
     else:
-        return array[sorted_index, :]
+        results = sorted_index[:n_neighbors]
+
+    if return_index:
+        return list(results)
+    else:
+        return array[results]
 
 
 class BiasedRFClassifier(BaseEstimator):
@@ -139,9 +144,10 @@ class BiasedRFClassifier(BaseEstimator):
         index_min = y[y==labels_min]
         # separate training set for major and minor labels
         x_maj = x[index_maj, :]
-        x_min = x[index_min, :]
 
-        for x in x_min:
-            t_nn_x = neareast_neighbor(x, x_maj, self.k_nearest_neighbor)
+        critical_set = []
+        for idx in index_min:
+            critical_set.append(x[idx, :])
+            t_nn_x = k_nearest_neighbor(x[idx, :], x_maj, self.k_nearest_neighbor)
 
         return NotImplemented
