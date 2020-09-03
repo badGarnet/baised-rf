@@ -21,3 +21,13 @@ class TestBiasedRandomForestClassifier(unittest.TestCase):
         x_list = self.x.tolist()
         x_array = brfc()._get_val(x_list)
         np.testing.assert_array_equal(self.x, x_array)
+
+    def test_stack_df_and_array(self):
+        x_df = pd.DataFrame(
+            self.x, 
+            columns=[f'col_{i}' for i in range(self.x.shape[1])]
+        )
+        combined = brfc._stack(x_df, self.y)
+        np.testing.assert_array_equal(self.x, combined[:, :-1])
+        np.testing.assert_array_equal(self.y.ravel(), combined[:, -1].ravel())
+
