@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from barf.base import BaseEstimator, train_test_split, roc_curve
+from barf.base import *
 import matplotlib.pyplot as plt
 
 
@@ -41,6 +41,64 @@ class TestBaseUtils(unittest.TestCase):
         plt.plot(fps, tps, '--r')
         plt.savefig('tmp/roc_perfect_bad.png')
         plt.close()
+
+    def test_k_folds_split_size(self):
+        x = np.random.rand(100).reshape(10, 10)
+        splits = k_fold_split(x, folds=3)
+        self.assertEqual(3, len(splits))
+
+    def test_k_folds_split_content_sizes(self):
+        x = np.random.rand(100).reshape(10, 10)
+        splits = k_fold_split(x, folds=3)
+        expected = [4, 4, 2]
+        for split, expect in zip(splits, expected):
+            with self.subTest(split=split, expect=expect):
+                self.assertEqual(expect, len(split))
+
+    def test_prepae_k_fold_data(self):
+        x = np.random.rand(100).reshape(10, 10)
+        splits = prepare_k_fold_data(x, folds=5)
+        for split in splits:
+            train, test = split
+            self.assertEqual(2, len(test))
+            self.assertEqual(8, len(train))
+
+    def test_prepare_k_fold_two_datasets(self):
+        x = np.random.rand(100).reshape(10, 10)
+        y = np.arange(10)
+        # give first column of x the same value as y
+        x[:, 0] = y
+        splits = prepare_k_fold_data(x, y, folds=5, random_seed=1)
+        for split in splits:
+            trainx, testx, trainy, testy = split
+            with self.subTest(trainx=trainx, testx=testx, trainy=trainy, testy=testy):
+                # check if the row matching is preserved
+                self.assertListEqual(
+                    trainx[:,0].astype(int).ravel().tolist(), 
+                    trainy.ravel().tolist()
+                )
+                self.assertListEqual(
+                    testx[:,0].astype(int).ravel().tolist(), 
+                    testy.ravel().tolist()
+                )
+
+    def test_k_fold_validation(self):
+        x = np.random.rand(100).reshape(10, 10)
+        y = np.random.randint(0, 2, 10)
+
+        class FunEstimator(BaseEstimator):
+
+            def fit(self, x, y):
+                return self
+
+            def predict(self, x):
+                return x[:, 0]
+
+        estimator = FunEstimator()
+        callbacks = [roc_curve, classifier_report]
+        results = k_fold_validation(estimator, x, y, callbacks=callbacks)
+        self.assertEqual(5, len(results))
+
 
 
 class TestEstimator(unittest.TestCase):
