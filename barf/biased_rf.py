@@ -3,6 +3,8 @@ from .refrence_forest import build_tree, subsample, bagging_predict
 import numpy as np
 import pandas as pd
 import logging
+import multiprocessing
+from functools import partial
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ class RandomForestClassifier(BaseEstimator):
         self._trees = list()
         self._fitted = False
 
-    def fit(self, x, y):
+    def fit(self, x, y, multi=False):
         """fit the classifier
 
         Args:
@@ -41,18 +43,28 @@ class RandomForestClassifier(BaseEstimator):
         # set max feature hyper-parameters
         if self.max_features is None:
             self.max_features = x.shape[1]
-        for i in range(self.n_estimators):
-            # subsample for each tree
-            sample = subsample(data, self.sub_samples) 
-            tree = build_tree(
-                sample, self.max_depth, self.min_leaf_size,
-                self.max_features
-            )
-            self._trees.append(tree)
+        if multi:
+            with multiprocessing.Pool(None) as pool:
+                fit_one = partial(self._fit_one_tree, data=data)
+                pool.map(fit_one, range(self.n_estimators))
+        else:
+            for i in range(self.n_estimators):
+                self._fit_one_tree(i, data)
 
         self._fitted = True
 
         return self
+
+    def _fit_one_tree(self, seed, data):
+        # subsample for each tree
+        # TODO: use seed in subsample and tree building
+        sample = subsample(data, self.sub_samples) 
+        tree = build_tree(
+            sample, self.max_depth, self.min_leaf_size,
+            self.max_features
+        )
+        self._trees.append(tree)
+        return tree
 
     def predict(self, x):
         if not self._fitted:
