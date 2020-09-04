@@ -157,21 +157,23 @@ class BiasedRFClassifier(BaseEstimator):
         Returns:
             BiasedRFClassifier: fitted classifier
         """
+        x_val = self._get_val(x)
+        y_val = self._get_val(y)
         # get the critical set
-        x_critical, y_critical = self._get_critical_set(x, y)
+        x_critical, y_critical = self._get_critical_set(x_val, y_val)
         # fit the critical trees
         self._critical_trees.fit(x_critical, y_critical)
         # fit the none critical trees
-        self._none_critical_trees.fit(x, y)
+        self._none_critical_trees.fit(x_val, y_val)
         return self
 
     def predict(self, x):
         if not self._is_fitted():
             raise ValueError(f"model must be fitted first by calling {self.__class__.__name__}.fit(x, y)")
 
-        # stack trees together
         x_val = self._get_val(x)
-        all_trees = self._crtical_trees._trees + self._none_critical_trees._trees
+        # stack trees together
+        all_trees = self._critical_trees._trees + self._none_critical_trees._trees
         predictions = [
             bagging_predict(all_trees, row) for row in x_val
         ]
