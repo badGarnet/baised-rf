@@ -5,8 +5,29 @@ import pandas as pd
 
 log = logging.getLogger(name=__name__)
 
-# base class definition for estimator
+def train_test_split(*args, test_size=0.3, strat=None, random_seed=None):
+    # first shuffle the index selection
+    idx = list(range(len(args[0])))
+    np.random.seed(random_seed)
+    np.random.shuffle(idx)
+    # if strat is provided we have to split using the stratified column to ensure
+    # each category gets split the same way
+    if strat is None:
+        split_index = int(len(args[0]) * test_size)
+    else:
+        split_index = int(len(args[0]) * test_size)
+    
+    train = list()
+    test = list()
+    for arg in args:
+        if isinstance(arg, pd.DataFrame):
+            train.append(arg.iloc[idx[:-split_index]])
+            test.append(arg.iloc[idx[-split_index:]])
+        else:
+            train.append(arg[idx[:-split_index]])
+            test.append(arg[idx[-split_index:]])
 
+    return (train + test)
 
 class BaseEstimator:
     def __init__(self):

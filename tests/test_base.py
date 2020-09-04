@@ -1,5 +1,19 @@
 import unittest
-from barf.base import BaseEstimator
+import numpy as np
+from barf.base import BaseEstimator, train_test_split
+
+
+class TestBaseUtils(unittest.TestCase):
+    def test_train_test_split(self):
+        x = np.random.rand(100).reshape(10, 10)
+        x1, x2 = train_test_split(x)
+        self.assertTrue(len(x), len(x1) + len(x2))
+
+    def test_train_test_split_randomness(self):
+        x = np.random.rand(100).reshape(10, 10)
+        x1, x2 = train_test_split(x)
+        newx = np.concatenate([x1, x2], axis=0)
+        self.assertFalse((x == newx).all())
 
 
 class TestEstimator(unittest.TestCase):
