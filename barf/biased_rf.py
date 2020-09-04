@@ -160,7 +160,7 @@ def get_sorted_labels(y):
 
 
 def k_nearest_neighbor(p, candidates, n_neighbors, return_index=False):
-    """get the ``n_neighbor`` nearest members from ``array`` to ``p``, measured
+    """get the ``n_neighbor`` nearest members from ``candidates`` to ``p``, measured
     by Euclidean distance
 
     Args:
