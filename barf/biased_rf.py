@@ -24,32 +24,25 @@ class RandomForestClassifier(BaseEstimator):
         self._trees = list()
         self._fitted = False
 
-    # @staticmethod
-    # def _get_val(x):
-    #     if isinstance(x, pd.DataFrame):
-    #         x_val = x.values
-    #     else:
-    #         x_val = np.array(x)
-    #     return x_val
-
-    # @staticmethod
-    # def _stack(x, y):
-    #     x_val = RandomForestClassifier._get_val(x)
-    #     y_val = RandomForestClassifier._get_val(y)
-    #     if x_val.ndim != 2:
-    #         raise ValueError(f'x must be a 2D array but got shape {x.shape}')
-    #     if y_val.ndim == 1:
-    #         y_val = y.reshape(-1, 1)
-    #     elif y_val.ndim != 2:
-    #         raise ValueError(f'y must be either a 1D or 2D array but got shape {y.shape}')
-    #     return np.concatenate([x_val, y_val], axis=1)
-
     def fit(self, x, y):
+        """fit the classifier
+
+        Args:
+            x (numpy.ndarray or list): features, must be 2D, has shape (n_samples, n_features)
+            y (numpy.ndarray or list): labels, must be either 1D or 2D with just one row/column,
+                has length n_samples
+
+        Returns:
+            RandomForestClassifer: fitted classifier
+        """
         self._trees = list()
+        # stack x and y together horizontally (add y as the last column into x)
         data = self._stack(x, y)
+        # set max feature hyper-parameters
         if self.max_features is None:
             self.max_features = x.shape[1]
         for i in range(self.n_estimators):
+            # subsample for each tree
             sample = subsample(data, self.sub_samples) 
             tree = build_tree(
                 sample, self.max_depth, self.min_leaf_size,
@@ -71,7 +64,18 @@ class RandomForestClassifier(BaseEstimator):
         return np.array(predictions)
 
     def report(self, x, y):
+        """generate a confusion matrix like report in dict format for a fitted model
+
+        Args:
+            x (numpy.ndarray or list): features, must be 2D, has shape (n_samples, n_features)
+            y (numpy.ndarray or list): labels, must be either 1D or 2D with just one row/column,
+                has length n_samples
+
+        Returns:
+            dict: report on confusion matrix metrics
+        """
         pred = self.predict(x)
+        # t=true, f=false, p=positive, n=negative
         tp = (y * pred).sum()
         tn = ((1 - y) * (1 - pred)).sum()
         fp = ((1 - y) * pred).sum()
