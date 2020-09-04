@@ -51,12 +51,10 @@ class RandomForestClassifier(BaseEstimator):
                 self._fit_one_tree(i, data)
         else:
             # TODO: fix multiprocessing not storing trees properly
-            trees = Array('i', range(self.n_estimators))
-            with multiprocessing.Pool(None) as pool:
-                fit_one = partial(self._fit_one_tree, data=data)
-                pool.map(fit_one, range(self.n_estimators))
-
-            self._trees = trees
+            raise NotImplemented("currently multiprocessing is not supported")
+            # with multiprocessing.Pool(None) as pool:
+            #     fit_one = partial(self._fit_one_tree, data=data)
+            #     pool.map(fit_one, range(self.n_estimators))
 
         self._fitted = True
 
@@ -160,7 +158,7 @@ class BiasedRFClassifier(BaseEstimator):
     def __init__(
         self, p_critical=0.5, k_nearest_neighbor=10, n_estimators=100,
         max_depth=10, min_leaf_size=1, max_features=None, min_sample_split=2,
-        sub_samples=1, random_seed=None, njobs=None
+        sub_samples=1, random_seed=None, njobs=0
     ):
         self.p_critical = p_critical
         self.k_nearest_neighbor = k_nearest_neighbor
