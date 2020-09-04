@@ -11,10 +11,22 @@ log = logging.getLogger(__name__)
 
 
 class RandomForestClassifier(BaseEstimator):
+    """Random Forest Classifier for binary class classification
+
+    Attributes:
+        n_estimators (int, optional): number of trees to use. Defaults to 100.
+        max_depth (int, optional): maximum depth for each tree. Defaults to 10.
+        random_seed (int or None, optional): sets random seed. Defaults to None.
+        min_leaf_size (int, optional): minimum size of a leaf on the tree. Defaults to 1.
+        max_features (int or None, optional): maximum number of features to use per tree. Defaults to None.
+        min_sample_split (int, optional): minimum size of a node that can be splitted. Defaults to 2.
+        sub_samples (float, optional): Ratio of sample to use per tree, must be between 0 and 1. Defaults to 1.
+
+    """
     def __init__(
         self, n_estimators=100, max_depth=10, random_seed=None,
         min_leaf_size=1, max_features=None, min_sample_split=2,
-        sub_samples=1
+        sub_samples=1.
     ):
         self.n_estimators = n_estimators
         self.max_depth = max_depth
@@ -61,7 +73,17 @@ class RandomForestClassifier(BaseEstimator):
         return self
 
     def _fit_one_tree(self, seed, data, trees=None):
-        # subsample for each tree
+        """fitting one decision tree and add the result to ``self._trees``
+
+        Args:
+            seed (int): random seed, also indicates the index of the tree
+            data (numpy.ndarray): data with features and target together, target is the last column
+            trees (multiprocess.Array, optional): Stores trees for multiprocessing. Defaults to None.
+
+        Returns:
+            tree: the fitted tree
+        """
+        # fitting one decision tree
         # TODO: use seed in subsample and tree building
         sample = subsample(data, self.sub_samples) 
         tree = build_tree(
@@ -74,12 +96,23 @@ class RandomForestClassifier(BaseEstimator):
             self._trees.append(tree)
         return tree
 
-    def predict(self, x):
+    def predict(self, x, return_prob=True):
+        """make a prediction with fitted model
+
+        Args:
+            x (numpy.ndarray): features, x.shape[1] must match the number of features used in training
+
+        Raises:
+            ValueError: if model is not fitted yet
+
+        Returns:
+            numpy.ndarray: predicted class labels
+        """
         if not self._fitted:
             raise ValueError(f"model must be fitted first by calling {self.__class__.__name__}.fit(x, y)")
         x_val = self._get_val(x)
         predictions = [
-            bagging_predict(self._trees, row) for row in x_val
+            bagging_predict(self._trees, row, return_prob) for row in x_val
         ]
         return np.array(predictions)
 
@@ -155,6 +188,23 @@ def k_nearest_neighbor(p, candidates, n_neighbors, return_index=False):
 
 
 class BiasedRFClassifier(BaseEstimator):
+    """Random Forest Classifier for binary class classification using biased sample for 
+    unbalanced label problems
+
+    Attributes:
+        p_critical (float, optional): Size of the critial sample set relative to the full data set. Defaults to 0.5.
+        k_nearest_neighbor (int, optional): number of neighbors (from a member of the minor label set) 
+            to use (in the critical sample set) from the major label set. Defaults to 10.
+        n_estimators (int, optional): number of trees to use. Defaults to 100.
+        max_depth (int, optional): maximum depth for each tree. Defaults to 10.
+        random_seed (int or None, optional): sets random seed. Defaults to None.
+        min_leaf_size (int, optional): minimum size of a leaf on the tree. Defaults to 1.
+        max_features (int or None, optional): maximum number of features to use per tree. Defaults to None.
+        min_sample_split (int, optional): minimum size of a node that can be splitted. Defaults to 2.
+        sub_samples (float, optional): Ratio of sample to use per tree, must be between 0 and 1. Defaults to 1.
+        njobs (int, optional): NOT IMPLEMENT. Sets the number of jobs for parallel processing. Defaults to 0.
+
+    """
     def __init__(
         self, p_critical=0.5, k_nearest_neighbor=10, n_estimators=100,
         max_depth=10, min_leaf_size=1, max_features=None, min_sample_split=2,
@@ -173,6 +223,7 @@ class BiasedRFClassifier(BaseEstimator):
         # initialize the critical forest and the none critical forest
         self._critical_n_estimaor = int(n_estimators * p_critical)
         self._none_critical_n_estimaor = n_estimators - self._critical_n_estimaor
+        # initialize using the same hyper-parameters except for the n_estimators
         self._critical_trees = RandomForestClassifier(
             self._critical_n_estimaor, max_depth,
             random_seed, min_leaf_size, max_features, min_sample_split,
@@ -207,6 +258,17 @@ class BiasedRFClassifier(BaseEstimator):
         return self
 
     def predict(self, x):
+        """make a prediction with fitted model
+
+        Args:
+            x (numpy.ndarray): features, x.shape[1] must match the number of features used in training
+
+        Raises:
+            ValueError: if model is not fitted yet
+
+        Returns:
+            numpy.ndarray: predicted class labels
+        """
         if not self._is_fitted():
             raise ValueError(f"model must be fitted first by calling {self.__class__.__name__}.fit(x, y)")
 
@@ -219,6 +281,7 @@ class BiasedRFClassifier(BaseEstimator):
         return np.array(predictions)
 
     def _is_fitted(self):
+        """checks if the model is fitted"""
         return self._critical_trees._fitted & self._none_critical_trees._fitted
 
     def _get_critical_set(self, x, y):

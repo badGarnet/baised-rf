@@ -8,6 +8,14 @@ log = logging.getLogger(name=__name__)
 
 
 def get_val(x):
+    """helper function to get numpy array from the object
+
+    Args:
+        x (numpy.ndarray, pd.DataFrame, iterable): data to be converted into numpy.ndarray
+
+    Returns:
+        numpy.ndarray: numpy.ndarray representation of ``x``
+    """
     if isinstance(x, pd.DataFrame):
         x_val = x.values
     else:
@@ -15,6 +23,20 @@ def get_val(x):
     return x_val
 
 def stack(x, y):
+    """Stacking x and y together along axis=1
+
+    Args:
+        x (numpy.ndarray or list): must be 2D
+        y (numpy.ndarray or list): must either have the same length as ``x`` or the size of its first
+            dimension must match that of ``x``
+
+    Raises:
+        ValueError: when x is not 2D
+        ValueError: when y can't be appended to x
+
+    Returns:
+        numpy.ndarray: combined data with y appened as new columns to x
+    """
     x_val = get_val(x)
     y_val = get_val(y)
     if x_val.ndim != 2:
@@ -27,11 +49,29 @@ def stack(x, y):
 
 
 def k_fold_split(data, folds=5, random_seed=None):
+    """splits data into folds randomly
+
+    Args:
+        data (numpy.ndarray): data to split, if more than 1D splits along first axis.
+        folds (int, optional): number of folds to split. Defaults to 5.
+        random_seed (int or None, optional): sets the random seed. Defaults to None.
+
+    Returns:
+        tuple: splitted data, each member is a portion from the input ``data``
+    """
+    # shuffle data
     np.random.seed(random_seed)
     np.random.shuffle(data)
+
+    # sanity check
+    if folds > len(data):
+        raise ValueError(f"folds ({folds}) must be smaller than or equal to the number of data points ({len(data)}")
+
+    # compute the size for each split
     d_split = math.ceil(len(data) / folds)
     splits = list()
     for i in range(folds):
+        # add contents of the same size to each split
         if isinstance(data, pd.DataFrame):
             splits.append(data.iloc[
                 i * d_split : min((i+1) * d_split , len(data))
@@ -44,13 +84,33 @@ def k_fold_split(data, folds=5, random_seed=None):
 
 
 def prepare_k_fold_data(x, y=None, folds=5, random_seed=None):
+    """prepares data (either in one data object or separated x and y) into folds; 
+    each fold contains a training set and a validation set. If ``y`` is not ``None``
+    each fold contains train_x, test_x, train_y, test_y, in that order
+
+    Args:
+        x (numpy.ndarray or list): must be 2D, could contain target when ``y`` is ``None``
+        y (numpy.ndarray or list):, optional): target column. Defaults to None.
+        folds (int, optional): number of validation folds to generate. Defaults to 5.
+        random_seed (int or None, optional): set the random seed. Defaults to None.
+
+    Returns:
+        list: each memnber is one fold of data, see above for details
+    """
     collection = list()
     if y is not None:
         data = stack(x, y)
     else:
         data = x
+
+    # record where to break x an y when needed
     idx_y_start = x.shape[1]
+
+    # split the data into n groups
     splits = np.array(k_fold_split(data, folds, random_seed))
+
+    # use each group as a test set and for each group combine the rest of 
+    # the data as the corresponding train set
     for i, split in enumerate(splits):
         others = [j for j  in range(folds) if j != i]
         others = np.concatenate(splits[others], axis=0)
@@ -98,6 +158,20 @@ def k_fold_validation(estimator, x, y, folds=5, random_seed=None, callbacks=None
 
 
 def roc_curve(y_true, y_score, pos_label=None):
+    """generates the reciever operating characteristics curves for labels ``y_true``
+    and predicted probability ``y_score``. Source (wiki)[https://en.wikipedia.org/wiki/Receiver_operating_characteristic]
+
+    Args:
+        y_true (numpy.ndarray): labels
+        y_score (numpy.ndarray): predicted probability, must have the same shape as ``y_true``
+        pos_label (optional): label for the positive case in binary classification. 
+            Defaults to None (which means number 1 is positive)
+
+    Returns:
+        numpy.ndarray: true positive rate at a given threshold
+        numpy.ndarray: false positive rate at a given threshold
+        numpy.ndarray: thresholds
+    """
     if pos_label is None:
         pos_label = 1
     classes = np.unique(y_true)
@@ -127,8 +201,6 @@ def roc_curve(y_true, y_score, pos_label=None):
         fps = np.append([0], fps)
 
     return fps, tps, y_score[threshold_idxs]
-
-
 
 
 def classifier_report(y, pred):
@@ -194,6 +266,8 @@ class BaseEstimator:
 
     @staticmethod
     def _flatten_param_dict(param_dict, collection, prefix=None):
+        # use '__' to unravel nested dict as a flat dict
+        # e.g., {'a': 1, 'b': {'a': 1, 'b': 0}} ==> {'a': 1, 'b__a':1, 'b__b':0}
         for key, value in param_dict.items():
             if isinstance(value, dict):
                 collection = BaseEstimator._flatten_param_dict(value, collection, key)
@@ -205,20 +279,43 @@ class BaseEstimator:
         return collection
 
     def get_params(self, deep=False):
+        """get a summary of estimator parameters recursively
+
+        Args:
+            deep (bool, optional): If True, private parameters will be exposed as well. Defaults to False.
+
+        Returns:
+            dict: estimator parameters in dict format; if a parameter named 'foo' is a ``BaseEstimator`` object,
+                its params will be returned as 'foo__<param_name>'
+        """
         results = dict()
         for key, value in self.__dict__.items():
+            # check if an attribute is a protected attribute
             if key.startswith('_'):
+                # only expose it if deep==True
                 if deep:
+                    # use check_values in case value is an BaseEstimator
                     results[key] = self._check_value(value, deep)
             else:
+                # use check_values in case value is an BaseEstimator
                 results[key] = self._check_value(value)
         
         flattened = dict()
         return self._flatten_param_dict(results, flattened)
 
     def set_params(self, **kwargs):
+        """set the parameters of the estimator recursively; for nested objects use 
+        '<attribute_name>__<nested_object_param_name>' to reach them.
+        """
         for key, value in kwargs.items():
             if hasattr(self, key):
-                setattr(self, key, value)
+                obj = getattr(self, key)
+                if isinstance(obj, BaseEstimator):
+                    # strip the header of the keys
+                    new_values = {'__'.join(key.split('__')[1:]): val for key, val in value.items()}
+                    # set the param of the nested estimator
+                    obj.set_params(**new_values)
+                else:
+                    setattr(self, key, value)
             else:
                 log.warning(f'key {key} is not an attribute of the {self.__class__.__name__}')

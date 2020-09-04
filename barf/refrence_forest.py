@@ -180,9 +180,12 @@ def subsample(dataset, ratio):
 	return sample
  
 # Make a prediction with a list of bagged trees
-def bagging_predict(trees, row):
+def bagging_predict(trees, row, return_prob=False):
 	predictions = [predict(tree, row) for tree in trees]
-	return max(set(predictions), key=predictions.count)
+	if return_prob:
+		return sum(predictions) / float(len(predictions))
+	else:
+		return max(set(predictions), key=predictions.count)
  
 # Random Forest Algorithm
 def random_forest(train, test, max_depth, min_size, sample_size, n_trees, n_features):
