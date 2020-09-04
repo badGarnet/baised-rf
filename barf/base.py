@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import logging
+import numpy as np
+import pandas as pd
 
 log = logging.getLogger(name=__name__)
 
@@ -9,6 +11,26 @@ log = logging.getLogger(name=__name__)
 class BaseEstimator:
     def __init__(self):
         self.name = 'BaseEstimator'
+
+    @staticmethod
+    def _get_val(x):
+        if isinstance(x, pd.DataFrame):
+            x_val = x.values
+        else:
+            x_val = np.array(x)
+        return x_val
+
+    @staticmethod
+    def _stack(x, y):
+        x_val = BaseEstimator._get_val(x)
+        y_val = BaseEstimator._get_val(y)
+        if x_val.ndim != 2:
+            raise ValueError(f'x must be a 2D array but got shape {x.shape}')
+        if y_val.ndim == 1:
+            y_val = y.reshape(-1, 1)
+        elif y_val.ndim != 2:
+            raise ValueError(f'y must be either a 1D or 2D array but got shape {y.shape}')
+        return np.concatenate([x_val, y_val], axis=1)
 
     @staticmethod
     def _parse_params(parms):
