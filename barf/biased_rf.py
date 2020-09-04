@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import logging
 import multiprocessing
+from multiprocessing import Array
 from functools import partial
 
 log = logging.getLogger(__name__)
@@ -26,13 +27,15 @@ class RandomForestClassifier(BaseEstimator):
         self._trees = list()
         self._fitted = False
 
-    def fit(self, x, y, multi=False):
+    def fit(self, x, y, njobs=0):
         """fit the classifier
 
         Args:
             x (numpy.ndarray or list): features, must be 2D, has shape (n_samples, n_features)
             y (numpy.ndarray or list): labels, must be either 1D or 2D with just one row/column,
                 has length n_samples
+            njobs (int or None): specify how many threads to use for the job; None means using
+                all available threads
 
         Returns:
             RandomForestClassifer: fitted classifier
@@ -43,19 +46,23 @@ class RandomForestClassifier(BaseEstimator):
         # set max feature hyper-parameters
         if self.max_features is None:
             self.max_features = x.shape[1]
-        if multi:
+        if njobs == 0:
+            for i in range(self.n_estimators):
+                self._fit_one_tree(i, data)
+        else:
+            # TODO: fix multiprocessing not storing trees properly
+            trees = Array('i', range(self.n_estimators))
             with multiprocessing.Pool(None) as pool:
                 fit_one = partial(self._fit_one_tree, data=data)
                 pool.map(fit_one, range(self.n_estimators))
-        else:
-            for i in range(self.n_estimators):
-                self._fit_one_tree(i, data)
+
+            self._trees = trees
 
         self._fitted = True
 
         return self
 
-    def _fit_one_tree(self, seed, data):
+    def _fit_one_tree(self, seed, data, trees=None):
         # subsample for each tree
         # TODO: use seed in subsample and tree building
         sample = subsample(data, self.sub_samples) 
@@ -63,7 +70,10 @@ class RandomForestClassifier(BaseEstimator):
             sample, self.max_depth, self.min_leaf_size,
             self.max_features
         )
-        self._trees.append(tree)
+        if trees is not None:
+            trees[seed] = tree
+        else:
+            self._trees.append(tree)
         return tree
 
     def predict(self, x):
@@ -147,18 +157,33 @@ def k_nearest_neighbor(p, candidates, n_neighbors, return_index=False):
 
 
 class BiasedRFClassifier(BaseEstimator):
-    def __init__(self, p_critical=0.5, k_nearest_neighbor=10, n_estimators=100):
+    def __init__(
+        self, p_critical=0.5, k_nearest_neighbor=10, n_estimators=100,
+        max_depth=10, min_leaf_size=1, max_features=None, min_sample_split=2,
+        sub_samples=1, random_seed=None, njobs=None
+    ):
         self.p_critical = p_critical
         self.k_nearest_neighbor = k_nearest_neighbor
         self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.random_seed = random_seed
+        self.min_leaf_size = min_leaf_size
+        self.max_features = max_features
+        self.min_sample_split = min_sample_split
+        self.sub_samples = sub_samples
+        self.njobs = njobs
         # initialize the critical forest and the none critical forest
         self._critical_n_estimaor = int(n_estimators * p_critical)
         self._none_critical_n_estimaor = n_estimators - self._critical_n_estimaor
         self._critical_trees = RandomForestClassifier(
-            n_estimators=self._critical_n_estimaor
+            self._critical_n_estimaor, max_depth,
+            random_seed, min_leaf_size, max_features, min_sample_split,
+            sub_samples
         )
         self._none_critical_trees = RandomForestClassifier(
-            n_estimators=self._none_critical_n_estimaor
+            self._none_critical_n_estimaor, max_depth,
+            random_seed, min_leaf_size, max_features, min_sample_split,
+            sub_samples
         )
 
     def fit(self, x, y):
@@ -178,9 +203,9 @@ class BiasedRFClassifier(BaseEstimator):
         # get the critical set
         x_critical, y_critical = self._get_critical_set(x_val, y_val)
         # fit the critical trees
-        self._critical_trees.fit(x_critical, y_critical)
+        self._critical_trees.fit(x_critical, y_critical, njobs=self.njobs)
         # fit the none critical trees
-        self._none_critical_trees.fit(x_val, y_val)
+        self._none_critical_trees.fit(x_val, y_val, njobs=self.njobs)
         return self
 
     def predict(self, x):

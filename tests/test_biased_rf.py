@@ -41,7 +41,7 @@ class TestBiasedRandomForestClassifier(unittest.TestCase):
 
     def test_fit_multiprocessing(self):
         model = rfc()
-        model.fit(self.x, self.y, multi=True)
+        model.fit(self.x, self.y, njobs=None)
         self.assertTrue(model._fitted)
 
     def test_predict(self):
