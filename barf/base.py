@@ -2,8 +2,70 @@
 import logging
 import numpy as np
 import pandas as pd
+import math
 
 log = logging.getLogger(name=__name__)
+
+
+def k_fold_split(data, folds=5, random_seed=None):
+    np.random.seed(random_seed)
+    np.random.shuffle(data)
+    d_split = math.ceil(len(data) / folds)
+    splits = list()
+    for i in range(folds):
+        splits.append(data[
+            (i - 1) * d_split : min(i * d_split , len(data))
+        ])
+    return (splits)
+
+
+def roc_curve(y_true, y_score, pos_label=None):
+    if pos_label is None:
+        pos_label = 1
+    classes = np.unique(y_true)
+    assert pos_label in classes
+
+    # convert y_true to bools
+    y_true = (y_true == pos_label)
+
+    # sort the score and truth labels to be used later
+    sorted_idx = np.argsort(y_score, kind='margesort')[::-1]
+    y_score = y_score[sorted_idx]
+    y_true = y_true[sorted_idx]
+
+    # getting indices for distinct values from y_score for thresholds
+    threshold_idxs = np.where(np.diff(y_score))[0]
+    # add the last point so we have a curve reaching to the end
+    threshold_idxs = np.append(threshold_idxs, [len(y_true)-1])
+    # calculate at each threshold how many true positives are by summing 
+    # y_true at each threshold level using cumsum
+    tps = np.cumsum(y_true)[threshold_idxs]
+    # calculate the false positive numbers at each threshold level
+    # the threshold index itself is the count for predicted positive 
+    # at each threshold (+1 for numpy starting at 0)
+    fps = 1 + threshold_idxs - tps
+    # make sure curves starts at 0, 0
+    if (tps[0] != 0) or (fps[0] != 0):
+        tps = np.append([0], tps)
+        fps = np.append([0], fps)
+
+    return fps, tps, y_score[threshold_idxs]
+
+
+
+
+def classifier_report(y, pred):
+    tp = (y * pred).sum()
+    tn = ((1 - y) * (1 - pred)).sum()
+    fp = ((1 - y) * pred).sum()
+    fn = (y * (1 - pred)).sum()
+    return {
+        'true_positives': tp,
+        'true_negatives': tn,
+        'false_positives': fp,
+        'false_negatives': fn
+    }
+
 
 def train_test_split(*args, test_size=0.3, strat=None, random_seed=None):
     # first shuffle the index selection
@@ -17,17 +79,16 @@ def train_test_split(*args, test_size=0.3, strat=None, random_seed=None):
     else:
         split_index = int(len(args[0]) * test_size)
     
-    train = list()
-    test = list()
+    results = list()
     for arg in args:
         if isinstance(arg, pd.DataFrame):
-            train.append(arg.iloc[idx[:-split_index]])
-            test.append(arg.iloc[idx[-split_index:]])
+            results.append(arg.iloc[idx[:-split_index]])
+            results.append(arg.iloc[idx[-split_index:]])
         else:
-            train.append(arg[idx[:-split_index]])
-            test.append(arg[idx[-split_index:]])
+            results.append(arg[idx[:-split_index]])
+            results.append(arg[idx[-split_index:]])
 
-    return (train + test)
+    return (results)
 
 class BaseEstimator:
     def __init__(self):
