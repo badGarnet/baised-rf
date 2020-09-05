@@ -19,27 +19,53 @@ class TestBaseUtils(unittest.TestCase):
     def test_roc_curve_random(self):
         y = np.random.randint(0, 2, 100)
         pred = np.random.rand(100)
-        fps, tps, _ = roc_curve(y, pred)
+        fps, tps = roc_curve(y, pred)
         plt.plot(fps, tps, '--')
         plt.savefig('tmp/roc_random.png')
         plt.close()
 
     def test_roc_curve_perfect_good(self):
         y = np.random.randint(0, 2, 100)
-        fps, tps, _ = roc_curve(y, y)
+        fps, tps = roc_curve(y, y)
         self.assertEqual(0, fps[1])
-        self.assertEqual(y.sum(), tps[1])
+        self.assertEqual(1, tps[1])
         plt.plot(fps, tps, '--r')
         plt.savefig('tmp/roc_perfect.png')
         plt.close()
 
     def test_roc_curve_perfect_bad(self):
         y = np.random.randint(0, 2, 100)
-        fps, tps, _ = roc_curve(y, 1-y)
+        fps, tps = roc_curve(y, 1-y)
         self.assertEqual(0, tps[1])
-        self.assertEqual(100-y.sum(), fps[1])
+        self.assertEqual(1, fps[1])
         plt.plot(fps, tps, '--r')
         plt.savefig('tmp/roc_perfect_bad.png')
+        plt.close()
+
+    def test_prc_curve_random(self):
+        y = np.random.randint(0, 2, 100)
+        pred = np.random.rand(100)
+        fps, tps = prc_curve(y, pred)
+        plt.plot(fps, tps, '--')
+        plt.savefig('tmp/prc_random.png')
+        plt.close()
+
+    def test_prc_curve_perfect_good(self):
+        y = np.random.randint(0, 2, 100)
+        fps, tps = prc_curve(y, y)
+        # self.assertEqual(0, fps[1])
+        # self.assertEqual(1, tps[1])
+        plt.plot(fps, tps, '--r')
+        plt.savefig('tmp/prc_perfect.png')
+        plt.close()
+
+    def test_prc_curve_perfect_bad(self):
+        y = np.random.randint(0, 2, 100)
+        fps, tps = prc_curve(y, 1-y)
+        # self.assertEqual(0, tps[1])
+        # self.assertEqual(1, fps[1])
+        plt.plot(fps, tps, '--r')
+        plt.savefig('tmp/prc_perfect_bad.png')
         plt.close()
 
     def test_k_folds_split_size(self):
@@ -91,11 +117,11 @@ class TestBaseUtils(unittest.TestCase):
             def fit(self, x, y):
                 return self
 
-            def predict(self, x):
+            def predict(self, x, return_prob=False):
                 return x[:, 0]
 
         estimator = FunEstimator()
-        callbacks = [roc_curve, classifier_report]
+        callbacks = {'roc': ('probs', roc_curve)}
         results = k_fold_validation(estimator, x, y, callbacks=callbacks)
         self.assertEqual(5, len(results))
 

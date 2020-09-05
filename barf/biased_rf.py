@@ -257,7 +257,7 @@ class BiasedRFClassifier(BaseEstimator):
         self._none_critical_trees.fit(x_val, y_val, njobs=self.njobs)
         return self
 
-    def predict(self, x):
+    def predict(self, x, return_prob=True):
         """make a prediction with fitted model
 
         Args:
@@ -276,7 +276,7 @@ class BiasedRFClassifier(BaseEstimator):
         # stack trees together
         all_trees = self._critical_trees._trees + self._none_critical_trees._trees
         predictions = [
-            bagging_predict(all_trees, row) for row in x_val
+            bagging_predict(all_trees, row, return_prob) for row in x_val
         ]
         return np.array(predictions)
 

@@ -136,7 +136,7 @@ def k_fold_validation(estimator, x, y, folds=5, random_seed=None, callbacks=None
         y ([type]): [description]
         folds (int, optional): [description]. Defaults to 5.
         random_seed ([type], optional): [description]. Defaults to None.
-        callbacks ([type], optional): [description]. Defaults to None.
+        callbacks (dict, optional): keys specify what result to use ('labels' or 'probs'). Defaults to None.
 
     Returns:
         [type]: [description]
@@ -147,19 +147,21 @@ def k_fold_validation(estimator, x, y, folds=5, random_seed=None, callbacks=None
     for i, split in enumerate(splits):
         trainx, valx, trainy, valy = split
         estimator = estimator.fit(trainx, trainy)
-        pred_y = estimator.predict(valx)
+        pred_y = estimator.predict(valx, return_prob=False)
+        pred_p = estimator.predict(valx, return_prob=True)
+        preds = {'labels': pred_y, 'probs': pred_p}
 
-        call_returns[f'fold_{i+1}'] = list()
+        call_returns[f'fold_{i+1}'] = dict()
 
         if callbacks is not None:
-            for callback in callbacks:
-                call_returns[f'fold_{i+1}'].append(callback(valy, pred_y))
+            for key, callback in callbacks.items():
+                call_returns[f'fold_{i+1}'][key] = (
+                    callback[1](valy, preds[callback[0]]))
     return call_returns
 
 
-def roc_curve(y_true, y_score, pos_label=None):
-    """generates the reciever operating characteristics curves for labels ``y_true``
-    and predicted probability ``y_score``. Source (wiki)[https://en.wikipedia.org/wiki/Receiver_operating_characteristic]
+def get_tps_fps(y_true, y_score, pos_label=None):
+    """generate true positive rate and false positive rate with different thresholds
 
     Args:
         y_true (numpy.ndarray): labels
@@ -170,11 +172,9 @@ def roc_curve(y_true, y_score, pos_label=None):
     Returns:
         numpy.ndarray: true positive rate at a given threshold
         numpy.ndarray: false positive rate at a given threshold
-        numpy.ndarray: thresholds
     """
     if pos_label is None:
         pos_label = 1
-    classes = np.unique(y_true)
 
     # convert y_true to bools
     y_true = (y_true == pos_label)
@@ -192,15 +192,55 @@ def roc_curve(y_true, y_score, pos_label=None):
     # y_true at each threshold level using cumsum
     tps = np.cumsum(y_true)[threshold_idxs]
     # calculate the false positive numbers at each threshold level
+    fps = 1 + threshold_idxs - tps
+    return tps, fps
+
+
+def prc_curve(y_true, y_score, pos_label=None):
+    """make precision-recall curve for classification probability scores.
+    Source `Suzanne Ekelund <https://acutecaretesting.org/en/articles/precision-recall-curves-what-are-they-and-how-are-they-used>`_
+
+    Args:
+        y_true (numpy.ndarray): labels
+        y_score (numpy.ndarray): predicted probability, must have the same shape as ``y_true``
+        pos_label (optional): label for the positive case in binary classification. 
+            Defaults to None (which means number 1 is positive)]
+
+    Returns:
+        numpy.ndarray: true positive rate at a given threshold
+        numpy.ndarray: false positive rate at a given threshol
+    """
+    tps, fps = get_tps_fps(y_true, y_score, pos_label)
+    recall, precision = tps / y_true.sum(), tps / (tps + fps)
+    if (recall[0] != 0) or (precision[0] != 1):
+        recall = np.append([0], recall)
+        precision = np.append([1], precision)
+    return recall, precision
+
+
+def roc_curve(y_true, y_score, pos_label=None):
+    """generates the reciever operating characteristics curves for labels ``y_true``
+    and predicted probability ``y_score``. 
+    Source `wiki <https://en.wikipedia.org/wiki/Receiver_operating_characteristic>`_
+
+    Args:
+        y_true (numpy.ndarray): labels
+        y_score (numpy.ndarray): predicted probability, must have the same shape as ``y_true``
+        pos_label (optional): label for the positive case in binary classification. 
+            Defaults to None (which means number 1 is positive)
+
+    Returns:
+        numpy.ndarray: true positive rate at a given threshold
+        numpy.ndarray: false positive rate at a given threshold
+
+    """
+    tps, fps = get_tps_fps(y_true, y_score, pos_label)
     # the threshold index itself is the count for predicted positive 
     # at each threshold (+1 for numpy starting at 0)
-    fps = 1 + threshold_idxs - tps
-    # make sure curves starts at 0, 0
     if (tps[0] != 0) or (fps[0] != 0):
         tps = np.append([0], tps)
         fps = np.append([0], fps)
-
-    return fps, tps, y_score[threshold_idxs]
+    return fps / (len(y_true) - y_true.sum()), tps / y_true.sum()
 
 
 def classifier_report(y, pred):
